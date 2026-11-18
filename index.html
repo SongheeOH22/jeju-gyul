@@ -48,6 +48,20 @@
   .seg button{border:0;background:transparent;padding:6px 10px;border-radius:12px;font-size:14px;font-family:'Jua'}
   .seg button.on{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12)}
   .icon-btn{border:0;padding:7px 11px;font-size:14px;font-family:'Jua';border-radius:15px}
+  #exitAsk,#bye{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px}
+  #exitAsk[hidden],#bye[hidden]{display:none}
+  #exitAsk{background:rgba(40,30,20,.28)}
+  #exitAsk .box{padding:20px 22px;max-width:360px;text-align:center}
+  #exitAsk .q,#bye .q{font-family:'Jua';font-size:20px;color:#5a3a1a}
+  #exitAsk .s,#bye .s{margin-top:8px;font-size:13.5px;line-height:1.55;color:#7a6250}
+  #exitAsk .btns{display:flex;gap:8px;margin-top:16px}
+  #exitAsk .btns button,#byeBack{flex:1;border:0;border-radius:14px;padding:11px;font-family:'Jua';font-size:16px;cursor:pointer}
+  #exitNo{background:#f3ebe0;color:#6a5040}
+  #exitYes,#byeBack{background:linear-gradient(180deg,#ffa143,#f27a0c);color:#fff}
+  #bye{background:linear-gradient(180deg,#bfe3f7,#fde7cf 70%,#ffd9a8)}
+  #bye .box{text-align:center;max-width:380px}
+  #bye .e{font-size:54px}
+  #byeBack{margin-top:22px;padding:13px 26px;flex:none}
   #toast{position:absolute;left:50%;bottom:72px;transform:translateX(-50%) translateY(8px);padding:10px 18px;font-size:16px;opacity:0;transition:all .4s;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   #action{position:absolute;right:22px;bottom:26px;border:0;border-radius:999px;padding:18px 26px;font-family:'Jua';font-size:20px;color:#fff;background:linear-gradient(180deg,#ffa143,#f27a0c);box-shadow:0 8px 22px rgba(242,122,12,.45),inset 0 -3px 0 rgba(0,0,0,.12);transform:scale(.6);opacity:0;transition:all .25s;pointer-events:none}
@@ -194,7 +208,19 @@
     </div>
     <button class="icon-btn glass" id="soundBtn" title="소리">🔊<span class="tx"> 소리</span></button>
     <button class="icon-btn glass" id="outfitBtn" title="옷 갈아입기">🎽<span class="tx"> 옷 갈아입기</span></button>
+    <button class="icon-btn glass" id="exitBtn" title="나가기">🚪<span class="tx"> 나가기</span></button>
   </div>
+  <div id="exitAsk" hidden><div class="box glass">
+    <div class="q">🍊 귤밭에서 나갈까요?</div>
+    <div class="s">나가면 친구들 화면에서도 내 캐릭터가 사라지고<br>소리와 화면이 모두 꺼져요.</div>
+    <div class="btns"><button id="exitNo">조금 더 쉴래요</button><button id="exitYes">나가기</button></div>
+  </div></div>
+  <div id="bye" hidden><div class="box">
+    <div class="e">🍊🌊</div>
+    <div class="q">오늘도 귤밭에서 쉬어 가 주셔서 고마워요</div>
+    <div class="s">게임이 완전히 종료됐어요. 이제 이 탭을 닫아도 돼요.</div>
+    <button id="byeBack">다시 들어가기</button>
+  </div></div>
   <div id="toast" class="glass"></div>
   <div id="rest" class="glass">
     <div class="rhead">
@@ -267,7 +293,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="config.js"></script>
 <script>
-// 함께하기 연결 준비: net.js(아래 module)가 연결되면 이 약속이 풀려요.
+// 함께하기 연결 준비: 아래 연결 코드(module)가 연결되면 이 약속이 풀려요.
 (function(){
   let done; const ready = new Promise(r => { done = r; });
   window.__jejuNetResolve = v => { done(v); };
@@ -275,7 +301,100 @@
   window.claude = { use: name => name === 'room' ? ready : Promise.resolve(null) };
 })();
 </script>
-<script type="module" src="net.js"></script>
+<script type="module">
+// 제주 귤밭 쉼터 — 함께하기 연결 (Trystero, 서버 없는 P2P)
+// 페이지 본체가 쓰는 연결 방식(presence / peers)을 그대로 흉내 냅니다.
+const CFG = Object.assign({appId: 'jeju-gyul-shelter', room: 'gyul-1', strategy: 'nostr', supabaseUrl: '', supabaseKey: '', turn: []}, window.JEJU_CONFIG || {});
+const PKG = {
+  nostr: 'https://esm.run/trystero@0.25',
+  mqtt: 'https://esm.run/@trystero-p2p/mqtt@0.25',
+  torrent: 'https://esm.run/@trystero-p2p/torrent@0.25',
+  supabase: 'https://esm.run/@trystero-p2p/supabase@0.25',
+};
+const qs = new URLSearchParams(location.search);
+const roomName = String(qs.get('room') || CFG.room || 'gyul-1').replace(/[^\w\-가-힣]/g, '').slice(0, 40) || 'gyul-1';
+const strategy = PKG[CFG.strategy] ? CFG.strategy : 'nostr';
+const resolve = window.__jejuNetResolve || (() => {});
+window.__jejuNetInfo = {room: roomName, strategy, error: ''};
+
+async function start(){
+  const lib = await import(CFG.libUrl || PKG[strategy]);
+  const {joinRoom, selfId} = lib;
+  const config = {appId: CFG.appId};
+  if (strategy === 'supabase'){
+    if (!CFG.supabaseUrl || !CFG.supabaseKey) throw new Error('config.js에 supabaseUrl과 supabaseKey를 넣어주세요');
+    config.appId = CFG.supabaseUrl; config.supabaseKey = CFG.supabaseKey; config.relayConfig = {supabaseKey: CFG.supabaseKey};
+  }
+  if (Array.isArray(CFG.turn) && CFG.turn.length){ config.turnConfig = CFG.turn; config.rtcConfig = {iceServers: CFG.turn}; }
+  const room = joinRoom(config, roomName);
+
+  // --- Trystero changed its API over versions: support both shapes
+  const act = room.makeAction('pres');
+  const oldApi = Array.isArray(act);
+  const send = oldApi ? (d, to) => act[0](d, to) : (d, to) => act.send(d, to ? {target: to} : undefined);
+  const listen = fn => oldApi ? act[1]((d, id) => fn(d, id)) : (act.onMessage = (d, meta) => fn(d, meta && typeof meta === 'object' ? meta.peerId : meta));
+  const setHandler = (name, fn) => oldApi ? room[name](fn) : (room[name] = fn);
+
+  // --- presence state shared with everyone in the room
+  let me = {peer: selfId, by: null, isMe: true, sameTab: true, kind: 'viewer', guest: false, presence: {}, updatedAt: Date.now()};
+  let myState = {};
+  const others = new Map(), lastSeen = new Map();
+  let snapshot = Object.freeze([me]);
+  const listeners = new Set();
+  let pending = {joined: [], left: [], updated: []}, scheduled = false;
+  const rebuild = () => { snapshot = Object.freeze([me, ...others.values()]); };
+  const flushChanges = () => {
+    if (scheduled) return; scheduled = true;
+    setTimeout(() => {
+      scheduled = false;
+      const ch = {peers: snapshot, joined: pending.joined, left: pending.left, updated: pending.updated};
+      pending = {joined: [], left: [], updated: []};
+      listeners.forEach(fn => { try { fn(ch); } catch (e){ console.error(e); } });
+    }, 0);
+  };
+  const drop = id => {
+    const p = others.get(id); if (!p) return;
+    others.delete(id); lastSeen.delete(id); rebuild(); pending.left.push(p); flushChanges();
+  };
+  listen((d, id) => {
+    if (!id || id === selfId || !d || typeof d !== 'object') return;
+    const st = d.s && typeof d.s === 'object' && !Array.isArray(d.s) ? d.s : {};
+    const had = others.has(id);
+    const p = Object.freeze({peer: String(id), by: null, isMe: false, sameTab: false, kind: 'viewer', guest: false, presence: Object.freeze(st), updatedAt: Date.now()});
+    others.set(id, p); lastSeen.set(id, Date.now()); rebuild();
+    (had ? pending.updated : pending.joined).push(p); flushChanges();
+  });
+  setHandler('onPeerJoin', id => { lastSeen.set(id, Date.now()); try { send({s: myState}, id); } catch (e){} });
+  setHandler('onPeerLeave', id => drop(id));
+
+  let dirty = true, lastSent = 0, left = false;
+  const tick = setInterval(() => {
+    const now = Date.now();
+    if (dirty || now - lastSent > 1500){ try { send({s: myState}); } catch (e){} dirty = false; lastSent = now; }
+    lastSeen.forEach((t, id) => { if (now - t > 12000) drop(id); });
+  }, 100);
+  const leave = () => { if (left) return; left = true; clearInterval(tick); try { room.leave(); } catch (e){} };
+  window.addEventListener('pagehide', leave);
+
+  return {
+    roomName, strategy,
+    peers: () => snapshot,
+    onPeers(fn){ listeners.add(fn); setTimeout(() => fn({peers: snapshot, joined: snapshot.slice(), left: [], updated: []}), 0); return () => listeners.delete(fn); },
+    presence(patch){
+      for (const k in patch){ if (patch[k] === null) delete myState[k]; else myState[k] = patch[k]; }
+      myState = Object.assign({}, myState);
+      me = Object.freeze(Object.assign({}, me, {presence: Object.freeze(Object.assign({}, myState)), updatedAt: Date.now()}));
+      rebuild(); dirty = true;
+      return Promise.resolve();
+    },
+    leave,
+    connected: () => !left,
+    onConnection(fn){ setTimeout(() => fn(true), 0); return () => {}; },
+    emit: () => Promise.resolve(), on: () => () => {},
+  };
+}
+start().then(api => resolve(api)).catch(e => { console.warn('[귤밭 연결 실패]', e); window.__jejuNetInfo.error = String(e && e.message || e); resolve(null); });
+</script>
 <script>
 (function(){
 'use strict';
@@ -2189,7 +2308,7 @@ function placeAtSeat(){
 
 // ================= Together: friends in the same orchard (room) =================
 let room = null, userCap = null, myPeer = null, roomReady = false, joinQuiet = true, roomChecked = false;
-const PAGE_VER = 'gh-4';
+const PAGE_VER = 'gh-6';
 const netInfo = {connected: null, everConnected: false, err: '', presErr: '', presOk: 0, peersSeen: 0};
 let playMode = 'together';
 try { if (localStorage.getItem('jejuGyulMode') === 'solo') playMode = 'solo'; } catch(e){}
@@ -2812,6 +2931,8 @@ $('#soundBtn').onclick = () => {
 const keys = {};
 let modalOpen = false, zen = false;
 addEventListener('keydown', e => {
+  if (quitted) return;
+  if (!$('#exitAsk').hidden){ if (e.key === 'Escape') closeExit(); return; }
   if (selecting || modalOpen) return;
   if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
   if (zen){ e.preventDefault(); standUp(); return; }
@@ -3504,7 +3625,45 @@ function update(dt, time){
 }
 
 applyTOD();
+// --- 창이 안 보이면 소리 끄기 (탭 전환·창 닫기·패널 닫기·최소화)
+let lastFrameAt = performance.now(), audioAsleep = false;
+function setAudioSleep(on){
+  if (on === audioAsleep) return; audioAsleep = on;
+  if (!actx) return;
+  if (on){ if (actx.state === 'running') actx.suspend(); }
+  else if (actx.state === 'suspended') actx.resume();
+}
+document.addEventListener('visibilitychange', () => setAudioSleep(document.hidden));
+addEventListener('pagehide', () => { audioAsleep = false; setAudioSleep(true); });
+addEventListener('pageshow', () => { if (!document.hidden) setAudioSleep(false); });
+setInterval(() => {
+  // 화면에 안 그려지고 있으면(창이 가려지거나 패널이 닫힘) 소리도 재움
+  const stalled = performance.now() - lastFrameAt > 1500;
+  if (stalled || document.hidden) setAudioSleep(true);
+}, 500);
+// --- 나가기: 방에서 빠지고, 소리·화면을 모두 끄고 종료
+let quitted = false;
+function openExit(){ if (quitted) return; $('#exitAsk').hidden = false; }
+function closeExit(){ $('#exitAsk').hidden = true; }
+async function quitGame(){
+  if (quitted) return; quitted = true;
+  $('#exitAsk').hidden = true;
+  try { if (room){ await Promise.race([room.presence(PRESENCE_OFF), new Promise(r => setTimeout(r, 400))]); if (room.leave) room.leave(); } } catch (e){}
+  try { if (actx) actx.close(); } catch (e){}
+  actx = null;
+  try { renderer.dispose(); const gl = renderer.getContext(); const ext = gl && gl.getExtension('WEBGL_lose_context'); if (ext) ext.loseContext(); } catch (e){}
+  $('#c').style.display = 'none';
+  $('#bye').hidden = false;
+  try { window.close(); } catch (e){}
+}
+$('#exitBtn').onclick = openExit;
+$('#exitNo').onclick = closeExit;
+$('#exitYes').onclick = quitGame;
+$('#exitAsk').addEventListener('click', e => { if (e.target.id === 'exitAsk') closeExit(); });
+$('#byeBack').onclick = () => location.reload();
 function loop(){
+  if (quitted) return;
+  lastFrameAt = performance.now(); if (audioAsleep && !document.hidden) setAudioSleep(false);
   const dt = Math.min(clock.getDelta(), .05);
   update(dt, clock.elapsedTime);
   renderer.render(scene, camera);
